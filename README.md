@@ -136,8 +136,10 @@ with diminishing returns, weighs rare terms more and doubles title matches, so a
 0.8 s.
 
 The sync only downloads new or changed PDFs, does not list the library again while its version stays the same,
-indexes duplicate files once, and simply retries later a PDF that Zotero has not uploaded yet. The PDFs must be
-stored on zotero.org (Zotero Storage): the Web API cannot reach linked files or WebDAV.
+indexes duplicate files once, and simply retries later a PDF that Zotero has not uploaded yet. PDFs stored on
+zotero.org (Zotero Storage) come from the Web API, which cannot reach linked files or WebDAV. When the Zotero
+desktop app runs on the same machine, the sync reads the PDFs from its storage folder first
+(`~/Zotero/storage/<item key>/`), which also covers libraries whose files sync through WebDAV.
 
 ## Configuration
 
@@ -148,6 +150,7 @@ Setting `ZOTEGREP_HOME`, or passing `--home DIR`, keeps both under one directory
 | Variable | Purpose |
 | --- | --- |
 | `ZOTEGREP_HOME` | one directory for the configuration and the data |
+| `ZOTEGREP_ZOTERO_STORAGE` | Zotero desktop's storage folder, read before the Web API (default: `~/Zotero/storage`) |
 | `ZOTEGREP_OCR_LANGUAGES` | Tesseract languages, e.g. `eng+deu` (default: English and French when installed) |
 | `TESSDATA_PREFIX` | where Tesseract's language data is, if it is not found automatically |
 

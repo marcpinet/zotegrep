@@ -1,11 +1,13 @@
 """Synchronization with the Zotero Web API: metadata, PDFs, collections, tag
 colors, notes and annotations."""
+import os
 import re
 import json
 import time
 import sqlite3
 import logging
 import threading
+from pathlib import Path
 
 from pyzotero import zotero
 from pyzotero.errors import ResourceNotFoundError
@@ -17,10 +19,51 @@ from zotegrep.text import NO_TEXT_MAX_CHARS, extract_pages, fold, normalize_text
 logger = logging.getLogger(__name__)
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_ITEM_KEY_RE = re.compile(r"^[A-Za-z0-9]{8}$")
 
 # Failed indexings (key, version): retried once per process, so that a broken
 # PDF is not reopened at every sync.
 _index_failed: set[tuple[str, int]] = set()
+
+
+# --------------------------------------------------------------------------
+# Local Zotero storage
+# --------------------------------------------------------------------------
+
+def local_storage_dir() -> Path | None:
+    """Zotero desktop's own storage folder (<dir>/<attachment key>/<file>).
+
+    Files that Zotero syncs through WebDAV never reach zotero.org, so the web
+    API answers 404 for them; they are only on this machine. The folder is
+    ~/Zotero/storage unless ZOTEGREP_ZOTERO_STORAGE says otherwise."""
+    raw = os.environ.get("ZOTEGREP_ZOTERO_STORAGE")
+    path = Path(raw).expanduser() if raw else Path.home() / "Zotero" / "storage"
+    return path if path.is_dir() else None
+
+
+def read_local_pdf(storage: Path | None, key: str, filename: str) -> bytes | None:
+    """The attachment's PDF from Zotero's local storage, or None if it is not
+    there. The key and the file name come from the API: neither may lead
+    outside the storage folder."""
+    if storage is None or not _ITEM_KEY_RE.match(key):
+        return None
+    folder = storage / key
+    if not folder.is_dir():
+        return None
+    name = Path(filename).name
+    exact = folder / name if name and not name.startswith(".") else None
+    try:
+        if exact is not None and exact.is_file():
+            return exact.read_bytes()
+        # Renamed on disk: accept the folder's only visible file if it is a PDF.
+        visible = [p for p in folder.iterdir() if p.is_file() and not p.name.startswith(".")]
+        if len(visible) == 1:
+            data = visible[0].read_bytes()
+            if data.startswith(b"%PDF"):
+                return data
+    except OSError as e:
+        logger.warning("Cannot read local copy of %s: %s", key, e)
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -133,6 +176,8 @@ class ZoteroSync:
         self._cancel = False
         self._progress_cb = None
         self._waiting = 0
+        self._local = 0
+        self._storage = local_storage_dir()
 
     def cancel(self):
         self._cancel = True
@@ -141,6 +186,7 @@ class ZoteroSync:
         self._cancel = False
         self._progress_cb = progress_cb
         self._waiting = 0
+        self._local = 0
 
         self._report("Checking library version...")
         library_version = f"{self._library_tag}:{self.zot.last_modified_version()}"
@@ -174,6 +220,8 @@ class ZoteroSync:
 
     def _outcome(self, done: str, failed: int) -> str:
         notes = [f"{failed} failed"] if failed else []
+        if self._local:
+            notes.append(f"{self._local} PDF{'s' if self._local > 1 else ''} read from local Zotero storage")
         if self._waiting:
             notes.append(f"{self._waiting} PDF{'s' if self._waiting > 1 else ''} not uploaded to Zotero yet")
         return f"{done} ({', '.join(notes)})" if notes else done
@@ -259,7 +307,13 @@ class ZoteroSync:
             self._report(f"[{i}/{len(to_download)}] {item['filename']}")
             path = store.pdf_path(self.library_id, item["key"])
             try:
-                pdf_bytes = self.zot.file(item["key"])
+                # Local Zotero storage first: with WebDAV file sync the web
+                # API has no file to give (404).
+                pdf_bytes = read_local_pdf(self._storage, item["key"], item["filename"])
+                if pdf_bytes is not None:
+                    self._local += 1
+                else:
+                    pdf_bytes = self.zot.file(item["key"])
                 tmp = path.with_suffix(".part")
                 tmp.write_bytes(pdf_bytes)
                 tmp.replace(path)

@@ -12,6 +12,8 @@ from zotegrep.sync import replace_pages
 def home(tmp_path, monkeypatch):
     """A fresh ZoteGrep home (config + index) for each test."""
     monkeypatch.delenv("ZOTEGREP_HOME", raising=False)
+    # Never read the developer's real Zotero storage; tests create this folder when they need it.
+    monkeypatch.setenv("ZOTEGREP_ZOTERO_STORAGE", str(tmp_path / "zotero-storage"))
     config.set_home(tmp_path)
     store.init_db()
     yield tmp_path
