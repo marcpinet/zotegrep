@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/zotegrep/"><img alt="PyPI" src="https://img.shields.io/pypi/v/zotegrep?style=flat-square&labelColor=15181e&color=ffe566&logo=pypi&logoColor=ffe566"></a>
+  <a href="https://pepy.tech/projects/zotegrep"><img alt="PyPI Downloads" src="https://static.pepy.tech/personalized-badge/zotegrep?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLUE&right_color=ORANGE&left_text=downloads"></a>
   <a href="https://pypi.org/project/zotegrep/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/zotegrep?style=flat-square&labelColor=15181e&color=15181e&logo=python&logoColor=ffe566"></a>
   <a href="https://github.com/marcpinet/zotegrep/actions/workflows/ci.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/marcpinet/zotegrep/ci.yml?branch=main&style=flat-square&labelColor=15181e&logo=githubactions&logoColor=ffe566&label=tests"></a>
   <img alt="SQLite FTS5 trigram" src="https://img.shields.io/badge/SQLite-FTS5%20trigram-15181e?style=flat-square&logo=sqlite&logoColor=ffe566">
